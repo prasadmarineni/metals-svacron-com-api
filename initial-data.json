@@ -1,0 +1,39 @@
+{
+  "gold": {
+    "metal": "Gold",
+    "lastUpdated": "2025-12-30T09:30:00.000Z",
+    "rates": [
+      { "purity": "24K (999)", "price": 6850, "unit": "₹/gram", "change": 45, "changePercent": 0.66 },
+      { "purity": "22K (916)", "price": 6275, "unit": "₹/gram", "change": 41, "changePercent": 0.65 },
+      { "purity": "18K (750)", "price": 5138, "unit": "₹/gram", "change": 34, "changePercent": 0.67 }
+    ],
+    "history": {
+      "oneMonth": [],
+      "yearly": {}
+    }
+  },
+  "silver": {
+    "metal": "Silver",
+    "lastUpdated": "2025-12-30T09:30:00.000Z",
+    "rates": [
+      { "purity": "999", "price": 82, "unit": "₹/gram", "change": 0.5, "changePercent": 0.61 },
+      { "purity": "Sterling (925)", "price": 76, "unit": "₹/gram", "change": 0.46, "changePercent": 0.61 }
+    ],
+    "history": {
+      "oneMonth": [],
+      "yearly": {}
+    }
+  },
+  "platinum": {
+    "metal": "Platinum",
+    "lastUpdated": "2025-12-30T09:30:00.000Z",
+    "rates": [
+      { "purity": "999", "price": 3200, "unit": "₹/gram", "change": 20, "changePercent": 0.63 },
+      { "purity": "950", "price": 3040, "unit": "₹/gram", "change": 19, "changePercent": 0.63 }
+    ],
+    "history": {
+      "oneMonth": [],
+      "yearly": {}
+    }
+  }
+}

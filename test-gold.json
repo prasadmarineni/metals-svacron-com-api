@@ -1,0 +1,15 @@
+{
+  "name": "Gold",
+  "symbol": "Au",
+  "lastUpdated": "2025-12-30T11:30:00.000Z",
+  "rates": [
+    {
+      "purity": "24K (999)",
+      "price": 7200,
+      "change": 50,
+      "changePercent": 0.7
+    }
+  ],
+  "history": [],
+  "chartData": []
+}

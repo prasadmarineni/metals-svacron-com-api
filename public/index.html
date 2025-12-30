@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Metals Admin - Price Management</title>
+  
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+    }
+
+    h1 {
+      color: #333;
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 16px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+    }
+
+    .tab {
+      background: white;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 500;
+      transition: all 0.3s;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .tab:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    }
+
+    .tab.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+
+    .card h2 {
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 24px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      color: #555;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .rate-inputs {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .rate-input {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .rate-input label {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 5px;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 15px 40px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+
+    .alert {
+      padding: 15px 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .alert.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .alert.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .current-data {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+
+    .current-data h3 {
+      margin-bottom: 15px;
+      color: #333;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .data-table th,
+    .data-table td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .data-table th {
+      background: #667eea;
+      color: white;
+      font-weight: 600;
+    }
+
+    .data-table tr:hover {
+      background: #f5f5f5;
+    }
+
+    .loader {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .loader.active {
+      display: block;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .api-info {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+
+    .api-info h4 {
+      color: #856404;
+      margin-bottom: 10px;
+    }
+
+    .api-info code {
+      background: #f8f9fa;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+    }
+  </style>
+</head>
+<body>
+  <!-- Firebase Initialization (must be before login screen) -->
+  <script>
+    // Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyDOu8PkqJ_V5N9CWzkAk-gks7gb3srS98g",
+      authDomain: "metals-svacron-com.firebaseapp.com",
+      projectId: "metals-svacron-com",
+      databaseURL: "https://metals-svacron-com-default-rtdb.firebaseio.com",
+      storageBucket: "metals-svacron-com.firebasestorage.app"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
+    // Auth state observer
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        // User is signed in
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('admin-dashboard').style.display = 'block';
+        document.getElementById('user-email').textContent = user.email;
+        
+        // Load initial data
+        if (typeof loadConfigData === 'function') {
+          loadConfigData();
+        }
+      } else {
+        // User is signed out
+        document.getElementById('login-screen').style.display = 'flex';
+        document.getElementById('admin-dashboard').style.display = 'none';
+      }
+    });
+
+    // Sign in with Google
+    async function signInWithGoogle() {
+      try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        await auth.signInWithPopup(provider);
+      } catch (error) {
+        const errorEl = document.getElementById('login-error');
+        errorEl.textContent = 'Login failed: ' + error.message;
+        errorEl.style.display = 'block';
+      }
+    }
+
+    // Sign out
+    async function signOut() {
+      try {
+        await auth.signOut();
+      } catch (error) {
+        alert('Sign out failed: ' + error.message);
+      }
+    }
+
+    // Get auth token for API requests
+    async function getAuthToken() {
+      const user = auth.currentUser;
+      if (user) {
+        return await user.getIdToken();
+      }
+      return null;
+    }
+    
+    // Wait for DOM to load before accessing elements
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('Admin Dashboard Loading...');
+      console.log('Hostname:', window.location.hostname);
+    });
+  </script>
+
+  <!-- Login Screen -->
+  <div id="login-screen" style="display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+    <div style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); max-width: 400px; width: 100%;">
+      <h1 style="text-align: center; margin-bottom: 30px;">🏆 Admin Login</h1>
+      <p style="text-align: center; color: #666; margin-bottom: 30px;">Sign in to manage metal prices</p>
+      <button onclick="signInWithGoogle()" style="width: 100%; padding: 15px; background: #4285F4; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path fill="#fff" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#fff" d="M9.003 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.96v2.332C2.44 15.983 5.485 18 9.003 18z"/><path fill="#fff" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71 0-.593.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z"/><path fill="#fff" d="M9.003 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.464.891 11.426 0 9.003 0 5.485 0 2.44 2.017.96 4.958L3.967 7.29c.708-2.127 2.692-3.71 5.036-3.71z"/></svg>
+        Sign in with Google
+      </button>
+      <div id="login-error" style="margin-top: 20px; padding: 10px; background: #fee; color: #c33; border-radius: 4px; display: none;"></div>
+    </div>
+  </div>
+
+  <!-- Admin Dashboard -->
+  <div id="admin-dashboard" style="display: none;">
+  <div class="container">
+    <div class="header">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <h1>🏆 Metals Price Management</h1>
+          <p class="subtitle">Update gold, silver, and platinum prices for metals.svacron.com</p>
+        </div>
+        <div style="text-align: right;">
+          <p id="user-email" style="color: #666; margin-bottom: 10px;"></p>
+          <button onclick="signOut()" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 6px; cursor: pointer;">Sign Out</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('gold')">Gold</button>
+      <button class="tab" onclick="switchTab('silver')">Silver</button>
+      <button class="tab" onclick="switchTab('platinum')">Platinum</button>      <button class="tab" onclick="switchTab('config')">⚙️ Configuration</button>
+    </div>
+
+    <!-- Gold Tab -->
+    <div id="gold-tab" class="tab-content active">
+      <div class="card">
+        <h2>Update Gold Prices</h2>
+        <div id="gold-alert" class="alert"></div>
+        
+        <div class="rate-inputs">
+          <div class="rate-input">
+            <label>Date</label>
+            <input type="date" id="gold-date" value="" max="9999-12-31">
+            <p style="color: #666; font-size: 13px; margin-top: 5px;">
+              📅 Select date for this price update (default: today)
+            </p>
+          </div>
+        </div>
+        
+        <div class="rate-inputs">
+          <div class="rate-input">
+            <label>24K Gold Price (₹/gram)</label>
+            <input type="number" id="gold-24k" step="0.01" placeholder="6850.00" oninput="calculateGoldPurities()">
+            <p style="color: #666; font-size: 13px; margin-top: 5px;">
+              💡 Enter 24K price - other purities will be calculated automatically
+            </p>
+          </div>
+        </div>
+
+        <div class="calculated-values" id="gold-calculated" style="display: none; margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+          <h4 style="margin-bottom: 10px; color: #555;">📊 Calculated Purities:</h4>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+            <div>
+              <span style="color: #666; font-size: 13px;">22K (91.67%)</span>
+              <p style="font-size: 18px; font-weight: bold; color: #333; margin-top: 3px;" id="calc-22k">₹0.00</p>
+            </div>
+            <div>
+              <span style="color: #666; font-size: 13px;">18K (75%)</span>
+              <p style="font-size: 18px; font-weight: bold; color: #333; margin-top: 3px;" id="calc-18k">₹0.00</p>
+            </div>
+            <div>
+              <span style="color: #666; font-size: 13px;">14K (58.33%)</span>
+              <p style="font-size: 18px; font-weight: bold; color: #333; margin-top: 3px;" id="calc-14k">₹0.00</p>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn" onclick="updatePrices('gold')">Update Gold Prices</button>
+        <button class="btn btn-secondary" onclick="loadCurrentData('gold')" style="margin-left: 10px;">
+          Load Current Data
+        </button>
+
+        <div id="gold-loader" class="loader">
+          <div class="spinner"></div>
+          <p>Updating prices...</p>
+        </div>
+
+        <div id="gold-current" class="current-data" style="display:none;">
+          <h3>Current Gold Prices</h3>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Purity</th>
+                <th>Price (₹/gram)</th>
+                <th>Change</th>
+                <th>Change %</th>
+              </tr>
+            </thead>
+            <tbody id="gold-data-body"></tbody>
+          </table>
+          <p style="margin-top: 10px; color: #666; font-size: 14px;">
+            Last Updated: <span id="gold-last-updated"></span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Silver Tab -->
+    <div id="silver-tab" class="tab-content">
+      <div class="card">
+        <h2>Update Silver Prices</h2>
+        <div id="silver-alert" class="alert"></div>
+        
+        <div class="rate-inputs">
+          <div class="rate-input">
+            <label>Date</label>
+            <input type="date" id="silver-date" value="" max="9999-12-31">
+            <p style="color: #666; font-size: 13px; margin-top: 5px;">
+              📅 Select date for this price update (default: today)
+            </p>
+          </div>
+        </div>
+        
+        <div class="rate-inputs">
+          <div class="rate-input">
+            <label>999 Silver Price</label>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+              <label style="display: flex; align-items: center; gap: 5px; color: #666; font-size: 14px;">
+                <input type="radio" name="silver-unit" value="gram" checked onchange="updateSilverPlaceholder()">
+                Per Gram (₹)
+              </label>
+              <label style="display: flex; align-items: center; gap: 5px; color: #666; font-size: 14px;">
+                <input type="radio" name="silver-unit" value="kg" onchange="updateSilverPlaceholder()">
+                Per KG (₹)
+              </label>
+            </div>
+            <input type="number" id="silver-999" step="0.01" placeholder="82.00" oninput="calculateSilverPurities()">
+            <p style="color: #666; font-size: 13px; margin-top: 5px;">
+              💡 Enter 999 purity price (select unit above) - 925 sterling will be calculated automatically
+            </p>
+          </div>
+        </div>
+
+        <div class="calculated-values" id="silver-calculated" style="display: none; margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+          <h4 style="margin-bottom: 10px; color: #555;">📊 Calculated Purity:</h4>
+          <div>
+            <span style="color: #666; font-size: 13px;">Sterling Silver 925 (92.5%)</span>
+            <p style="font-size: 18px; font-weight: bold; color: #333; margin-top: 3px;" id="calc-925">₹0.00</p>
+          </div>
+        </div>
+
+        <button class="btn" onclick="updatePrices('silver')">Update Silver Prices</button>
+        <button class="btn btn-secondary" onclick="loadCurrentData('silver')" style="margin-left: 10px;">
+          Load Current Data
+        </button>
+
+        <div id="silver-loader" class="loader">
+          <div class="spinner"></div>
+          <p>Updating prices...</p>
+        </div>
+
+        <div id="silver-current" class="current-data" style="display:none;">
+          <h3>Current Silver Prices</h3>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Purity</th>
+                <th>Price (₹/gram)</th>
+                <th>Change</th>
+                <th>Change %</th>
+              </tr>
+            </thead>
+            <tbody id="silver-data-body"></tbody>
+          </table>
+          <p style="margin-top: 10px; color: #666; font-size: 14px;">
+            Last Updated: <span id="silver-last-updated"></span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Platinum Tab -->
+    <div id="platinum-tab" class="tab-content">
+      <div class="card">
+        <h2>Update Platinum Prices</h2>
+        <div id="platinum-alert" class="alert"></div>
+        
+        <div class="rate-inputs">
+          <div class="rate-input">
+            <label>Date</label>
+            <input type="date" id="platinum-date" value="" max="9999-12-31">
+            <p style="color: #666; font-size: 13px; margin-top: 5px;">
+              📅 Select date for this price update (default: today)
+            </p>
+          </div>
+        </div>
+        
+        <div class="rate-inputs">
+          <div class="rate-input">
+            <label>999 Platinum Price (₹/gram)</label>
+            <input type="number" id="platinum-999" step="0.01" placeholder="3200.00" oninput="calculatePlatinumPurities()">
+            <p style="color: #666; font-size: 13px; margin-top: 5px;">
+              💡 Enter 999 purity price - other purities will be calculated automatically
+            </p>
+          </div>
+        </div>
+
+        <div class="calculated-values" id="platinum-calculated" style="display: none; margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+          <h4 style="margin-bottom: 10px; color: #555;">📊 Calculated Purities:</h4>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+            <div>
+              <span style="color: #666; font-size: 13px;">950 Platinum (95%)</span>
+              <p style="font-size: 18px; font-weight: bold; color: #333; margin-top: 3px;" id="calc-950">₹0.00</p>
+            </div>
+            <div>
+              <span style="color: #666; font-size: 13px;">900 Platinum (90%)</span>
+              <p style="font-size: 18px; font-weight: bold; color: #333; margin-top: 3px;" id="calc-900">₹0.00</p>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn" onclick="updatePrices('platinum')">Update Platinum Prices</button>
+        <button class="btn btn-secondary" onclick="loadCurrentData('platinum')" style="margin-left: 10px;">
+          Load Current Data
+        </button>
+
+        <div id="platinum-loader" class="loader">
+          <div class="spinner"></div>
+          <p>Updating prices...</p>
+        </div>
+
+        <div id="platinum-current" class="current-data" style="display:none;">
+          <h3>Current Platinum Prices</h3>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Purity</th>
+                <th>Price (₹/gram)</th>
+                <th>Change</th>
+                <th>Change %</th>
+              </tr>
+            </thead>
+            <tbody id="platinum-data-body"></tbody>
+          </table>
+          <p style="margin-top: 10px; color: #666; font-size: 14px;">
+            Last Updated: <span id="platinum-last-updated"></span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Configuration Tab -->
+    <div id="config-tab" class="tab-content">
+      <div class="card">
+        <h2>⚙️ System Configuration</h2>
+        
+        <div id="config-alert" class="alert"></div>
+
+        <!-- Schedule Configuration -->
+        <h3>Automatic Price Sync Schedule</h3>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="scheduleEnabled" style="width: auto; margin-right: 10px;">
+            Enable Automatic Sync
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label>Sync Frequency (Cron Expression)</label>
+          <input type="text" id="scheduleFrequency" placeholder="0,30 9 * * * and 0 10 * * * and 55 11 * * *" value="0,30 9 * * * and 0 10 * * * and 55 11 * * *">
+          <p style="color: #666; font-size: 14px; margin-top: 5px;">
+            Default: <code>0,30 9 * * *</code> and <code>0 10 * * *</code> and <code>55 11 * * *</code> (9:00 AM, 9:30 AM, 10:00 AM, 11:55 AM IST daily)<br>
+            Examples:<br>
+            • <code>0 9 * * *</code> - Daily at 9:00 AM<br>
+            • <code>0,30 9 * * *</code> - 9:00 AM and 9:30 AM<br>
+            • <code>55 11 * * *</code> - Daily at 11:55 AM
+          </p>
+        </div>
+
+        <div class="form-group">
+          <label>Timezone</label>
+          <select id="scheduleTimezone">
+            <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+            <option value="America/New_York">America/New_York (EST)</option>
+            <option value="Europe/London">Europe/London (GMT)</option>
+            <option value="Asia/Dubai">Asia/Dubai (GST)</option>
+          </select>
+        </div>
+
+        <button class="btn" onclick="saveScheduleConfig()">Save Schedule Configuration</button>
+
+        <div class="current-data" style="display:block; margin-top: 20px;">
+          <h4>Database Management</h4>
+          <p id="lastSyncTime">Loading...</p>
+          <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+            <button class="btn" onclick="initializeDatabase()" style="background: #17a2b8;">
+              🎯 Initialize with Mock Data
+            </button>
+            <button class="btn btn-secondary" onclick="triggerManualSync()">
+              🔄 Sync from 5paisa.com
+            </button>
+            <button class="btn" onclick="recalculateChanges()" style="background: #ffc107; color: #000;">
+              🔢 Recalculate Change Values
+            </button>
+          </div>
+          <p style="color: #666; font-size: 14px; margin-top: 10px;">
+            <strong>Initialize</strong>: First-time setup with sample data (instant)<br>
+            <strong>Sync from 5paisa</strong>: Fetch live gold, silver, platinum prices (30-60s)<br>
+            <strong>Recalculate Changes</strong>: Fix change values based on history (useful after manual updates)<br>
+            <strong>For Exact Prices</strong>: Use manual update forms above (recommended)
+          </p>
+        </div>
+
+        <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+
+        <!-- API Call Logs -->
+        <h3>Recent API Call Logs</h3>
+        <div id="api-logs" class="current-data" style="display:block;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Status</th>
+                <th>Error</th>
+              </tr>
+            </thead>
+            <tbody id="logs-body">
+              <tr><td colspan="3">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="config-loader" class="loader">
+          <div class="spinner"></div>
+          <p>Processing...</p>
+        </div>
+      </div>
+    </div>
+
+
+  </div>
+
+  <script>
+    // Configuration
+    const API_BASE_URL = window.location.hostname === 'localhost' 
+      ? 'http://localhost:5001/metals-svacron-com/us-central1/api'
+      : 'https://us-central1-metals-svacron-com.cloudfunctions.net/api';
+    
+    console.log('API_BASE_URL:', API_BASE_URL);
+
+    // Set default date to today for all date inputs
+    function setDefaultDates() {
+      const today = new Date().toISOString().split('T')[0];
+      const dateInputs = ['gold-date', 'silver-date', 'platinum-date'];
+      dateInputs.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+          input.value = today;
+        }
+      });
+    }
+
+    // Call on page load
+    setDefaultDates();
+
+    // Update silver input placeholder based on unit selection
+    function updateSilverPlaceholder() {
+      const silverInput = document.getElementById('silver-999');
+      const isPerGram = document.querySelector('input[name="silver-unit"]:checked').value === 'gram';
+      silverInput.placeholder = isPerGram ? '82.00' : '82000.00';
+    }
+
+    // Tab switching
+    function switchTab(tabName) {
+      // Hide all tabs
+      document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+
+      // Show selected tab
+      document.getElementById(`${tabName}-tab`).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    // Show alert message
+    function showAlert(metal, message, type) {
+      const alertEl = document.getElementById(`${metal}-alert`);
+      alertEl.textContent = message;
+      alertEl.className = `alert ${type}`;
+      alertEl.style.display = 'block';
+      
+      setTimeout(() => {
+        alertEl.style.display = 'none';
+      }, 5000);
+    }
+
+    // Update prices
+    // Calculate gold purities based on 24K price
+    function calculateGoldPurities() {
+      const price24k = parseFloat(document.getElementById('gold-24k').value);
+      const calcDiv = document.getElementById('gold-calculated');
+      
+      if (price24k && price24k > 0) {
+        const price22k = (price24k * 0.9167).toFixed(2);
+        const price18k = (price24k * 0.7500).toFixed(2);
+        const price14k = (price24k * 0.5833).toFixed(2);
+        
+        document.getElementById('calc-22k').textContent = `₹${price22k}`;
+        document.getElementById('calc-18k').textContent = `₹${price18k}`;
+        document.getElementById('calc-14k').textContent = `₹${price14k}`;
+        calcDiv.style.display = 'block';
+      } else {
+        calcDiv.style.display = 'none';
+      }
+    }
+
+    // Calculate silver purities based on 999 price
+    function calculateSilverPurities() {
+      let price999 = parseFloat(document.getElementById('silver-999').value);
+      const calcDiv = document.getElementById('silver-calculated');
+      
+      if (price999 && price999 > 0) {
+        // Check if input is per kg, convert to per gram
+        const isPerKg = document.querySelector('input[name="silver-unit"]:checked').value === 'kg';
+        if (isPerKg) {
+          price999 = price999 / 1000; // Convert per kg to per gram
+        }
+        
+        const price925 = (price999 * 0.925 * 0.999).toFixed(2);
+        document.getElementById('calc-925').textContent = `₹${price925}/gram`;
+        calcDiv.style.display = 'block';
+      } else {
+        calcDiv.style.display = 'none';
+      }
+    }
+
+    // Calculate platinum purities based on 999 price
+    function calculatePlatinumPurities() {
+      const price999 = parseFloat(document.getElementById('platinum-999').value);
+      const calcDiv = document.getElementById('platinum-calculated');
+      
+      if (price999 && price999 > 0) {
+        const price950 = (price999 * 0.95 * 0.999).toFixed(2);
+        const price900 = (price999 * 0.90 * 0.999).toFixed(2);
+        document.getElementById('calc-950').textContent = `₹${price950}`;
+        document.getElementById('calc-900').textContent = `₹${price900}`;
+        calcDiv.style.display = 'block';
+      } else {
+        calcDiv.style.display = 'none';
+      }
+    }
+
+    async function updatePrices(metal) {
+      console.log('updatePrices called for:', metal);
+      const authToken = await getAuthToken();
+      console.log('Auth token:', authToken ? 'present' : 'missing');
+      
+      if (!authToken) {
+        showAlert(metal, 'Please sign in first', 'error');
+        return;
+      }
+
+      // Get date from input or use today
+      const dateInput = document.getElementById(`${metal}-date`);
+      const selectedDate = dateInput && dateInput.value ? dateInput.value : new Date().toISOString().split('T')[0];
+      console.log('Selected date:', selectedDate);
+
+      // Get rates based on metal
+      let rates = [];
+      if (metal === 'gold') {
+        const price24k = parseFloat(document.getElementById('gold-24k').value);
+        
+        if (!price24k || price24k <= 0) {
+          showAlert(metal, 'Please enter 24K gold price', 'error');
+          return;
+        }
+        
+        // Calculate all purities from 24K using market multipliers
+        rates = [
+          { purity: '999', price: parseFloat(price24k.toFixed(2)) },
+          { purity: '916', price: parseFloat((price24k * 0.9167).toFixed(2)) },
+          { purity: '750', price: parseFloat((price24k * 0.7500).toFixed(2)) },
+          { purity: '585', price: parseFloat((price24k * 0.5833).toFixed(2)) }
+        ];
+      } else if (metal === 'silver') {
+        let price999 = parseFloat(document.getElementById('silver-999').value);
+        
+        if (!price999 || price999 <= 0) {
+          showAlert(metal, 'Please enter 999 silver price', 'error');
+          return;
+        }
+        
+        // Check if input is per kg, convert to per gram
+        const isPerKg = document.querySelector('input[name="silver-unit"]:checked').value === 'kg';
+        if (isPerKg) {
+          price999 = price999 / 1000; // Convert per kg to per gram
+          console.log(`Silver: Converted from ₹${price999 * 1000}/kg to ₹${price999.toFixed(2)}/gram`);
+        }
+        
+        // Calculate 925 from 999 (per gram, 999 = 99.9% pure)
+        rates = [
+          { purity: '999', price: parseFloat(price999.toFixed(2)) },
+          { purity: '925', price: parseFloat((price999 * 0.925 * 0.999).toFixed(2)) }
+        ];
+      } else if (metal === 'platinum') {
+        const price999 = parseFloat(document.getElementById('platinum-999').value);
+        
+        if (!price999 || price999 <= 0) {
+          showAlert(metal, 'Please enter 999 platinum price', 'error');
+          return;
+        }
+        
+        // Calculate other purities from 999 (999 = 99.9% pure)
+        rates = [
+          { purity: '999', price: parseFloat(price999.toFixed(2)) },
+          { purity: '950', price: parseFloat((price999 * 0.95 * 0.999).toFixed(2)) },
+          { purity: '900', price: parseFloat((price999 * 0.90 * 0.999).toFixed(2)) }
+        ];
+      }
+
+      // Show loader
+      const loader = document.getElementById(`${metal}-loader`);
+      console.log('Showing loader for', metal, loader);
+      if (loader) loader.classList.add('active');
+
+      try {
+        console.log('Sending request to:', `${API_BASE_URL}/update-prices`);
+        const response = await fetch(`${API_BASE_URL}/update-prices`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ metal, rates, date: selectedDate })
+        });
+
+        console.log('Response status:', response.status);
+        const data = await response.json();
+        console.log('Response data:', data);
+
+        if (response.ok) {
+          showAlert(metal, `${metal.charAt(0).toUpperCase() + metal.slice(1)} prices updated successfully!`, 'success');
+          loadCurrentData(metal);
+        } else {
+          showAlert(metal, data.error || 'Failed to update prices', 'error');
+        }
+      } catch (error) {
+        console.error('Error in updatePrices:', error);
+        showAlert(metal, 'Network error: ' + error.message, 'error');
+      } finally {
+        const loader = document.getElementById(`${metal}-loader`);
+        if (loader) loader.classList.remove('active');
+      }
+    }
+
+    // Load current data
+    async function loadCurrentData(metal) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/metals/${metal}`);
+        const data = await response.json();
+
+        if (response.ok) {
+          const tbody = document.getElementById(`${metal}-data-body`);
+          tbody.innerHTML = '';
+
+          data.rates.forEach(rate => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td><strong>${rate.purity}</strong></td>
+              <td>₹${rate.price.toFixed(2)}</td>
+              <td style="color: ${rate.change >= 0 ? '#28a745' : '#dc3545'}">
+                ${rate.change >= 0 ? '+' : ''}₹${rate.change.toFixed(2)}
+              </td>
+              <td style="color: ${rate.changePercent >= 0 ? '#28a745' : '#dc3545'}">
+                ${rate.changePercent >= 0 ? '+' : ''}${rate.changePercent.toFixed(2)}%
+              </td>
+            `;
+            tbody.appendChild(row);
+          });
+
+          document.getElementById(`${metal}-last-updated`).textContent = 
+            new Date(data.lastUpdated).toLocaleString('en-IN');
+          document.getElementById(`${metal}-current`).style.display = 'block';
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+      }
+    }
+
+    // Load current data on page load for all metals
+    window.addEventListener('load', () => {
+      loadCurrentData('gold');
+      loadCurrentData('silver');
+      loadCurrentData('platinum');
+      loadConfigData();
+      loadApiLogs();
+    });
+
+    // Configuration functions
+    async function loadConfigData() {
+      try {
+        // Load schedule config
+        const scheduleResponse = await fetch(`${API_BASE_URL}/config/schedule`);
+        const scheduleData = await scheduleResponse.json();
+        
+        document.getElementById('scheduleEnabled').checked = scheduleData.enabled;
+        document.getElementById('scheduleFrequency').value = scheduleData.frequency;
+        document.getElementById('scheduleTimezone').value = scheduleData.timezone || 'Asia/Kolkata';
+        document.getElementById('lastSyncTime').textContent = scheduleData.lastRun 
+          ? new Date(scheduleData.lastRun).toLocaleString('en-IN')
+          : 'Never';
+      } catch (error) {
+        console.error('Error loading config:', error);
+      }
+    }
+
+    async function saveScheduleConfig() {
+      console.log('saveScheduleConfig called');
+      const authToken = await getAuthToken();
+      console.log('Auth token:', authToken ? 'present' : 'missing');
+      if (!authToken) {
+        showConfigAlert('Please sign in first', 'error');
+        return;
+      }
+
+      const loader = document.getElementById('config-loader');
+      if (loader) loader.classList.add('active');
+      console.log('Loader activated');
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/config/schedule`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            config: {
+              enabled: document.getElementById('scheduleEnabled').checked,
+              frequency: document.getElementById('scheduleFrequency').value,
+              timezone: document.getElementById('scheduleTimezone').value
+            }
+          })
+        });
+
+        console.log('Response status:', response.status);
+        const data = await response.json();
+        console.log('Response data:', data);
+
+        if (response.ok) {
+          showConfigAlert('Schedule configuration saved! Note: Cron schedule changes require redeployment.', 'success');
+        } else {
+          showConfigAlert(data.error || 'Failed to save configuration', 'error');
+        }
+      } catch (error) {
+        console.error('Error in saveScheduleConfig:', error);
+        showConfigAlert('Network error: ' + error.message, 'error');
+      } finally {
+        const loader = document.getElementById('config-loader');
+        if (loader) loader.classList.remove('active');
+      }
+    }
+
+    async function initializeDatabase() {
+      console.log('initializeDatabase called');
+      const authToken = await getAuthToken();
+      console.log('Auth token:', authToken ? 'present' : 'missing');
+      if (!authToken) {
+        showConfigAlert('Please sign in first', 'error');
+        return;
+      }
+
+      const confirmed = confirm('This will populate the database with sample metal prices. Continue?');
+      if (!confirmed) return;
+
+      const loader = document.getElementById('config-loader');
+      if (loader) loader.classList.add('active');
+      console.log('Loader activated');
+
+      try {
+        console.log('Sending initialize request');
+        const response = await fetch(`${API_BASE_URL}/initialize`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+
+        console.log('Response status:', response.status);
+        const data = await response.json();
+        console.log('Response data:', data);
+
+        if (response.ok) {
+          showConfigAlert('Database initialized successfully with sample data!', 'success');
+          loadConfigData();
+          // Reload price data
+          loadCurrentData('gold');
+          loadCurrentData('silver');
+          loadCurrentData('platinum');
+        } else {
+          showConfigAlert(data.error || 'Failed to initialize database', 'error');
+        }
+      } catch (error) {
+        console.error('Error in initializeDatabase:', error);
+        showConfigAlert('Network error: ' + error.message, 'error');
+      } finally {
+        const loader = document.getElementById('config-loader');
+        if (loader) loader.classList.remove('active');
+      }
+    }
+
+    async function triggerManualSync() {
+      console.log('triggerManualSync called');
+      const authToken = await getAuthToken();
+      console.log('Auth token:', authToken ? 'present' : 'missing');
+      if (!authToken) {
+        showConfigAlert('Please sign in first', 'error');
+        return;
+      }
+
+      const loader = document.getElementById('config-loader');
+      if (loader) loader.classList.add('active');
+      console.log('Loader activated');
+
+      try {
+        console.log('Sending sync request');
+        const response = await fetch(`${API_BASE_URL}/sync-prices`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ force: true })
+        });
+
+        console.log('Response status:', response.status);
+        const data = await response.json();
+        console.log('Response data:', data);
+
+        if (response.ok) {
+          showConfigAlert('⏳ Price sync started in background! Waiting 55 seconds for completion...', 'success');
+          
+          // Show countdown
+          let countdown = 55;
+          const countdownInterval = setInterval(() => {
+            countdown--;
+            if (countdown > 0) {
+              showConfigAlert(`⏳ Syncing prices... ${countdown} seconds remaining`, 'success');
+            } else {
+              clearInterval(countdownInterval);
+              showConfigAlert('✅ Price sync completed! Refresh the page to see updated prices.', 'success');
+            }
+          }, 1000);
+        } else {
+          showConfigAlert(data.error || 'Failed to start sync', 'error');
+        }
+      } catch (error) {
+        console.error('Sync error:', error);
+        showConfigAlert('Network error: ' + error.message, 'error');
+      } finally {
+        if (loader) loader.classList.remove('active');
+      }
+    }
+
+    // Recalculate change values for all metals
+    async function recalculateChanges() {
+      console.log('recalculateChanges called');
+      const authToken = await getAuthToken();
+      if (!authToken) {
+        showConfigAlert('Please sign in first', 'error');
+        return;
+      }
+
+      if (!confirm('This will recalculate change values for all metals based on their history. Current change values will be overwritten. Continue?')) {
+        return;
+      }
+
+      const loader = document.getElementById('config-loader');
+      if (loader) loader.classList.add('active');
+
+      try {
+        showConfigAlert('🔢 Recalculating change values...', 'success');
+        
+        const response = await fetch(`${API_BASE_URL}/recalculate-changes`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          const results = data.results;
+          const successCount = Object.values(results).filter(v => v === true).length;
+          showConfigAlert(`✅ Successfully recalculated changes for ${successCount} metals! Refresh to see updates.`, 'success');
+        } else {
+          showConfigAlert(data.error || 'Failed to recalculate changes', 'error');
+        }
+      } catch (error) {
+        console.error('Recalculate error:', error);
+        showConfigAlert('Network error: ' + error.message, 'error');
+      } finally {
+        if (loader) loader.classList.remove('active');
+      }
+    }
+
+    async function loadApiLogs() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/logs/api-calls`);
+        const logs = await response.json();
+
+        const tbody = document.getElementById('logs-body');
+        tbody.innerHTML = '';
+
+        if (logs.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="3">No logs yet</td></tr>';
+          return;
+        }
+
+        logs.slice(0, 20).forEach(log => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${new Date(log.timestamp).toLocaleString('en-IN')}</td>
+            <td style="color: ${log.success ? '#28a745' : '#dc3545'}">
+              ${log.success ? '✅ Success' : '❌ Failed'}
+            </td>
+            <td style="color: #dc3545;">${log.error || '-'}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      } catch (error) {
+        console.error('Error loading logs:', error);
+      }
+    }
+
+    function showConfigAlert(message, type) {
+      const alertEl = document.getElementById('config-alert');
+      alertEl.textContent = message;
+      alertEl.className = `alert ${type}`;
+      alertEl.style.display = 'block';
+      
+      setTimeout(() => {
+        alertEl.style.display = 'none';
+      }, 5000);
+    }
+  </script>
+  </div>
+</body>
+</html>

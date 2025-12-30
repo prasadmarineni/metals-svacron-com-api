@@ -1,0 +1,9 @@
+{
+  "apiNinjasKey": "Uqi+xFFHN4eJNsXNoe8HIw==XmWGPv3dGC7njm1T",
+  "usdToInrRate": 83.5,
+  "schedule": {
+    "enabled": true,
+    "frequency": "0,30 9 * * * and 0 10 * * * and 55 11 * * *",
+    "timezone": "Asia/Kolkata"
+  }
+}

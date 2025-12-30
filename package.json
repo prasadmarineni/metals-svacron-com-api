@@ -1,0 +1,26 @@
+{
+  "name": "metals-svacron-com",
+  "version": "1.0.0",
+  "description": "Firebase API backend for metals.svacron.com - manages metal prices and serves JSON data",
+  "main": "functions/lib/index.js",
+  "scripts": {
+    "build": "cd functions && npm run build",
+    "serve": "firebase emulators:start --only functions,hosting",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy",
+    "deploy:functions": "firebase deploy --only functions",
+    "deploy:hosting": "firebase deploy --only hosting",
+    "logs": "firebase functions:log"
+  },
+  "keywords": [
+    "firebase",
+    "metals",
+    "gold",
+    "silver",
+    "platinum",
+    "api"
+  ],
+  "author": "Svacron",
+  "license": "MIT"
+}

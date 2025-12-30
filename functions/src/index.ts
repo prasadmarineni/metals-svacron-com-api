@@ -7,7 +7,36 @@ import { ExternalApiService } from './externalApi';
 import { validateApiKey, validateAuthToken, getUserFromToken } from './utils';
 
 const app = express();
-app.use(cors({ origin: true }));
+
+// CORS Configuration - Restrict to specific domains
+const allowedOrigins = [
+  'https://metals.svacron.com',
+  'https://metals.svacron.com/',  // With trailing slash
+  'https://metals-svacron-com.vercel.app',
+  'https://metals-svacron-com.vercel.app/',  // With trailing slash
+  'http://localhost:3002',  // For local development
+  'http://localhost:3000',
+  'http://127.0.0.1:3002',
+  'http://127.0.0.1:3000'
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, Postman, curl)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`Blocked request from unauthorized origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 
 const metalService = new MetalDataService();
@@ -35,7 +64,8 @@ async function requireAuth(req: Request, res: Response, next: any) {
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  const { getISTTimestamp } = require('./utils');
+  res.json({ status: 'ok', timestamp: getISTTimestamp() });
 });
 
 // Get all metals data (JSON response)

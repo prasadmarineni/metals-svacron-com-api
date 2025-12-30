@@ -1,4 +1,4 @@
-import { db, admin, calculateChange, generateChartData, formatDate, getYesterdayDate } from './utils';
+import { db, admin, calculateChange, generateChartData, formatDate, getYesterdayDate, getISTDate, getISTTimestamp } from './utils';
 import { MetalData, MetalRate, HistoryEntry, AllMetalsResponse } from './types';
 
 export class MetalDataService {
@@ -18,8 +18,8 @@ export class MetalDataService {
     const metalRef = db.ref(`metals/${metal}`);
     console.log(`Database reference: metals/${metal}`);
 
-    const now = new Date();
-    // Use provided date or today's date
+    const now = getISTDate();
+    // Use provided date or today's date in IST
     const targetDate = date ? new Date(date + 'T00:00:00') : now;
     const today = formatDate(targetDate);
     const yesterday = getYesterdayDate();
@@ -32,28 +32,37 @@ export class MetalDataService {
     const history: HistoryEntry[] = historySnapshot.val() || [];
     console.log(`✓ History entries found: ${history.length}`);
     
-    const yesterdayData = history.find(h => h.date === yesterday);
-    console.log('Yesterday data:', yesterdayData || 'Not found');
+    // Sort history to find actual previous entry (not just yesterday by date)
+    const sortedHistory = [...history].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    
+    // Find the entry that comes right before today's date
+    const todayTime = new Date(today).getTime();
+    const previousEntry = sortedHistory
+      .filter(h => new Date(h.date).getTime() < todayTime)
+      .pop(); // Get the last entry before today
+    
+    console.log('Previous entry in history:', previousEntry || 'Not found (this will be first entry)');
     
     // Calculate changes for each purity
     console.log('Calculating price changes...');
     const updatedRates: MetalRate[] = rates.map((rate, index) => {
-      // Yesterday's history stores only the base purity (999) price
-      // We need to calculate proportional yesterday prices for other purities
+      // If no previous entry exists, this is the first entry - set change to 0
       let yesterdayRate: number;
       
-      if (yesterdayData?.price) {
+      if (previousEntry?.price) {
         // Calculate the ratio of current purity price to base purity price
         const basePriceToday = rates[0].price; // First purity is always the base (999)
         const purityRatio = rate.price / basePriceToday;
         
-        // Apply same ratio to yesterday's base price
-        yesterdayRate = yesterdayData.price * purityRatio;
-        console.log(`Purity ${rate.purity}: Today ${rate.price}, Yesterday base ${yesterdayData.price}, Ratio ${purityRatio.toFixed(4)}, Yesterday calculated ${yesterdayRate.toFixed(2)}`);
+        // Apply same ratio to previous entry's base price
+        yesterdayRate = previousEntry.price * purityRatio;
+        console.log(`Purity ${rate.purity}: Today ${rate.price}, Previous ${previousEntry.date} base ${previousEntry.price}, Ratio ${purityRatio.toFixed(4)}, Previous calculated ${yesterdayRate.toFixed(2)}`);
       } else {
-        // No yesterday data - use today's price (results in 0 change)
+        // No previous data - this is the first entry, use today's price (results in 0 change)
         yesterdayRate = rate.price;
-        console.log(`Purity ${rate.purity}: No yesterday data, using today's price ${rate.price}`);
+        console.log(`Purity ${rate.purity}: First entry, setting change to 0`);
       }
       
       const { change, changePercent } = calculateChange(rate.price, yesterdayRate);
@@ -93,20 +102,65 @@ export class MetalDataService {
       console.log(`Recalculated next day (${nextDayEntry.date}) change: ${change}`);
     }
     
-    // Keep last 30 days and reverse for storage (newest to oldest)
+    // Keep last 30 days
     updatedHistory = updatedHistory.slice(-30);
     console.log(`✓ Updated history length: ${updatedHistory.length}`);
+
+    // Determine which rates to use for top tiles (always use LATEST date)
+    const latestDate = updatedHistory[updatedHistory.length - 1].date;
+    let finalRates: MetalRate[];
+    
+    if (today === latestDate) {
+      // If updating today/latest date, use the calculated rates
+      finalRates = updatedRates;
+      console.log(`Using updated rates for latest date (${latestDate})`);
+    } else {
+      // If updating a backdated entry, fetch current rates and keep them
+      const currentSnapshot = await metalRef.once('value');
+      const currentData = currentSnapshot.val();
+      if (currentData && currentData.rates) {
+        finalRates = currentData.rates;
+        console.log(`Backdated update (${today}). Keeping existing latest rates for ${latestDate}`);
+      } else {
+        // Fallback: use the latest history entry's price to calculate rates
+        const latestEntry = updatedHistory[updatedHistory.length - 1];
+        const previousLatest = updatedHistory.length > 1 ? updatedHistory[updatedHistory.length - 2] : null;
+        
+        finalRates = rates.map(rate => {
+          const priceRatio = latestEntry.price / newHistoryEntry.price;
+          const adjustedPrice = parseFloat((rate.price * priceRatio).toFixed(2));
+          
+          // Calculate change for this rate
+          let rateChange = 0;
+          let rateChangePercent = 0;
+          if (previousLatest) {
+            const prevPrice = parseFloat((rate.price * (previousLatest.price / newHistoryEntry.price)).toFixed(2));
+            const changeResult = calculateChange(adjustedPrice, prevPrice);
+            rateChange = changeResult.change;
+            rateChangePercent = changeResult.changePercent;
+          }
+          
+          return {
+            purity: rate.purity,
+            price: adjustedPrice,
+            change: rateChange,
+            changePercent: rateChangePercent
+          };
+        });
+        console.log(`No existing rates. Calculated from latest history entry`);
+      }
+    }
 
     // Prepare updated data
     const metalData: MetalData = {
       name: metal.charAt(0).toUpperCase() + metal.slice(1),
       symbol: metal === 'gold' ? 'Au' : metal === 'silver' ? 'Ag' : 'Pt',
-      lastUpdated: now.toISOString(),
-      rates: updatedRates,
+      lastUpdated: getISTTimestamp(),
+      rates: finalRates,
       history: updatedHistory.reverse(), // Newest to oldest for display
       chartData: generateChartData(updatedHistory)
     };
-    console.log('Metal data prepared:', JSON.stringify(metalData, null, 2));
+    console.log('Metal data prepared with latest rates');
 
     // Save to Firebase Realtime Database
     console.log('Saving to Firebase Database...');
@@ -180,7 +234,7 @@ export class MetalDataService {
     }
 
     // Check if today's data exists
-    const today = formatDate(new Date());
+    const today = formatDate(getISTDate());
     const history: HistoryEntry[] = data.history || [];
     const todayEntry = history.find((h: HistoryEntry) => h.date === today);
     
@@ -202,7 +256,7 @@ export class MetalDataService {
       this.getMetalData('platinum')
     ]);
 
-    const lastUpdated = new Date().toISOString();
+    const lastUpdated = getISTTimestamp();
 
     const allMetalsData = {
       gold: gold!,

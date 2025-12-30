@@ -11,6 +11,30 @@ export const db = admin.database();
 export const storage = admin.storage();
 export { admin };
 
+// IST timezone offset (UTC+5:30)
+const IST_OFFSET = 5.5 * 60 * 60 * 1000; // 5.5 hours in milliseconds
+
+// Get current time in IST as Date object (for internal use)
+export function getISTDate(): Date {
+  const now = new Date();
+  return new Date(now.getTime() + IST_OFFSET);
+}
+
+// Get current time as ISO string in IST timezone format
+export function getISTTimestamp(): string {
+  const istDate = getISTDate();
+  
+  // Format as ISO string with +05:30 timezone
+  const year = istDate.getUTCFullYear();
+  const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(istDate.getUTCDate()).padStart(2, '0');
+  const hours = String(istDate.getUTCHours()).padStart(2, '0');
+  const minutes = String(istDate.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(istDate.getUTCSeconds()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}+05:30`;
+}
+
 // Validate Firebase Auth token
 export async function validateAuthToken(token: string): Promise<boolean> {
   try {
@@ -41,7 +65,7 @@ export function calculateChange(current: number, previous: number): { change: nu
 
 // Generate chart data for different time ranges
 export function generateChartData(history: HistoryEntry[]): MetalData['chartData'] {
-  const now = new Date();
+  const now = getISTDate();
   const sortedHistory = [...history].sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
   );
@@ -70,12 +94,14 @@ export function generateChartData(history: HistoryEntry[]): MetalData['chartData
   };
 }
 
-// Format date to YYYY-MM-DD
+// Format date to YYYY-MM-DD in IST (Indian Standard Time, UTC+5:30)
 export function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0];
+  // Convert to IST by adding 5 hours 30 minutes
+  const istDate = new Date(date.getTime() + IST_OFFSET);
+  return istDate.toISOString().split('T')[0];
 }
 
-// Get yesterday's date
+// Get yesterday's date in IST
 export function getYesterdayDate(): string {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);

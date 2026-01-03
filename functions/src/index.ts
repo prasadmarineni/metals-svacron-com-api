@@ -14,6 +14,8 @@ const allowedOrigins = [
   'https://metals.svacron.com/',  // With trailing slash
   'https://metals-svacron-com.vercel.app',
   'https://metals-svacron-com.vercel.app/',  // With trailing slash
+  'https://metals-svacron-com.firebaseapp.com',  // Firebase hosting (admin dashboard)
+  'https://metals-svacron-com.firebaseapp.com/',  // With trailing slash
   'http://localhost:3002',  // For local development
   'http://localhost:3000',
   'http://127.0.0.1:3002',
@@ -192,7 +194,7 @@ app.post('/initialize', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-// Manual sync trigger - start async, return immediately
+// Manual sync trigger - start async, return immediately (LEGACY - uses 5paisa)
 app.post('/sync-prices', requireAuth, async (req: Request, res: Response) => {
   try {
     // Start sync in background, don't wait for completion
@@ -208,6 +210,116 @@ app.post('/sync-prices', requireAuth, async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error starting sync:', error);
     return res.status(500).json({ error: 'Failed to start sync' });
+  }
+});
+
+// Sync from GRT Jewels (NEW - DEFAULT)
+app.post('/sync-prices-grt', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { scrapeAllMetals } = require('../lib/grtJewelsScraperSimple');
+    
+    console.log('🚀 Starting GRT Jewels price sync...');
+    
+    // Wait for scraping to complete (takes 1-2 seconds with simple scraper)
+    const prices = await scrapeAllMetals();
+    
+    // Update database with scraped prices
+    for (const metal of ['gold', 'silver', 'platinum']) {
+      const metalPrices = prices[metal as keyof typeof prices];
+      if (!metalPrices || typeof metalPrices !== 'object') continue;
+      
+      const rates = Object.entries(metalPrices).map(([purity, price]) => ({
+        purity,
+        price: price as number
+      })).filter(r => r.price !== null);
+      
+      if (rates.length > 0) {
+        await metalService.updateMetalPrices(metal as 'gold' | 'silver' | 'platinum', rates);
+        console.log(`✅ Updated ${metal} prices from GRT Jewels`);
+      }
+    }
+    
+    console.log('✅ GRT Jewels sync completed successfully');
+    
+    // Return after completion
+    res.json({
+      success: true,
+      message: 'GRT Jewels price sync completed successfully!',
+      data: prices
+    });
+  } catch (error) {
+    console.error('❌ GRT Jewels sync failed:', error);
+    return res.status(500).json({ error: 'Failed to complete GRT sync', details: String(error) });
+  }
+});
+
+// Sync from 5paisa (ALTERNATIVE SOURCE)
+app.post('/sync-prices-5paisa', requireAuth, async (req: Request, res: Response) => {
+  try {
+    // Start 5paisa sync in background, don't wait for completion
+    syncService.syncAllPrices()
+      .then(() => console.log('✓ 5paisa sync completed'))
+      .catch((error) => console.error('✗ 5paisa sync failed:', error));
+    
+    // Return immediately
+    res.json({
+      success: true,
+      message: '5paisa price sync started in background. Check logs in a few moments.'
+    });
+  } catch (error) {
+    console.error('Error starting 5paisa sync:', error);
+    return res.status(500).json({ error: 'Failed to start 5paisa sync' });
+  }
+});
+
+// Sync from GoodReturns (Puppeteer - BYPASSES CLOUDFLARE)
+app.post('/sync-prices-goodreturns', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { scrapeAllMetals } = require('../lib/goodReturnsScraperPuppeteer');
+    
+    console.log('🚀 Starting GoodReturns price sync (Puppeteer)...');
+    console.log('⏱️ This may take 15-30 seconds as it uses a real browser...');
+    
+    // Wait for scraping to complete (takes 15-30 seconds with Puppeteer)
+    const prices = await scrapeAllMetals();
+    
+    // Check if any prices were found
+    const hasData = prices.gold?.['999'] || prices.silver?.['999'] || prices.platinum?.['999'];
+    
+    if (!hasData) {
+      return res.status(500).json({ 
+        error: 'GoodReturns scraper failed to extract prices',
+        message: 'The website structure may have changed. Check logs for details.',
+        data: prices
+      });
+    }
+    
+    // Update database with scraped prices
+    for (const metal of ['gold', 'silver', 'platinum']) {
+      const metalPrices = prices[metal as keyof typeof prices];
+      if (!metalPrices || typeof metalPrices !== 'object') continue;
+      
+      const rates = Object.entries(metalPrices).map(([purity, price]) => ({
+        purity,
+        price: price as number
+      })).filter(r => r.price !== null);
+      
+      if (rates.length > 0) {
+        await metalService.updateMetalPrices(metal as 'gold' | 'silver' | 'platinum', rates);
+        console.log(`✅ Updated ${metal} prices from GoodReturns`);
+      }
+    }
+    
+    console.log('✅ GoodReturns sync completed successfully');
+    
+    res.json({
+      success: true,
+      message: 'GoodReturns price sync completed successfully!',
+      data: prices
+    });
+  } catch (error) {
+    console.error('❌ GoodReturns sync failed:', error);
+    return res.status(500).json({ error: 'Failed to complete GoodReturns sync', details: String(error) });
   }
 });
 
@@ -335,7 +447,7 @@ app.post('/recalculate-changes', requireAuth, async (req: Request, res: Response
 export const api = functions
   .runWith({
     timeoutSeconds: 540, // 9 minutes
-    memory: '512MB'
+    memory: '2GB' // Increased from 512MB for Puppeteer/Chromium
   })
   .https.onRequest(app);
 
@@ -344,13 +456,13 @@ export const api = functions
 export const scheduledPriceSync = functions
   .runWith({
     timeoutSeconds: 540, // 9 minutes
-    memory: '512MB'
+    memory: '512MB' // 5paisa API doesn't need heavy memory
   })
   .pubsub
   .schedule('0,30 9 * * *') // 9:00 AM and 9:30 AM IST daily
   .timeZone('Asia/Kolkata')
   .onRun(async (context) => {
-    console.log('Running scheduled price sync (Morning 9 AM slot)...');
+    console.log('Running scheduled price sync (Morning 9 AM slot) - 5paisa API...');
     
     try {
       // Check if scheduling is enabled
@@ -361,18 +473,14 @@ export const scheduledPriceSync = functions
         return null;
       }
       
-      // Run the sync
-      const result = await syncService.syncAllPrices();
+      // Use 5paisa API (reliable for scheduled sync)
+      console.log('🚀 Starting 5paisa price sync...');
+      await syncService.syncAllPrices();
       
-      if (result.success) {
-        console.log('Scheduled sync completed:', result.message);
-      } else {
-        console.error('Scheduled sync failed:', result.message);
-      }
-      
+      console.log('✅ 5paisa scheduled sync completed successfully');
       return null;
     } catch (error) {
-      console.error('Error in scheduled sync:', error);
+      console.error('❌ Error in 5paisa scheduled sync:', error);
       return null;
     }
   });
@@ -381,13 +489,13 @@ export const scheduledPriceSync = functions
 export const scheduledPriceSync10AM = functions
   .runWith({
     timeoutSeconds: 540,
-    memory: '512MB'
+    memory: '512MB' // 5paisa API doesn't need heavy memory
   })
   .pubsub
   .schedule('0 10 * * *') // 10:00 AM IST daily
   .timeZone('Asia/Kolkata')
   .onRun(async (context) => {
-    console.log('Running scheduled price sync (10 AM slot)...');
+    console.log('Running scheduled price sync (10 AM slot) - 5paisa API...');
     
     try {
       const config = await externalApiService.getScheduleConfig();
@@ -397,17 +505,14 @@ export const scheduledPriceSync10AM = functions
         return null;
       }
       
-      const result = await syncService.syncAllPrices();
+      // Use 5paisa API (reliable for scheduled sync)
+      console.log('🚀 Starting 5paisa price sync...');
+      await syncService.syncAllPrices();
       
-      if (result.success) {
-        console.log('Scheduled sync completed:', result.message);
-      } else {
-        console.error('Scheduled sync failed:', result.message);
-      }
-      
+      console.log('✅ 5paisa scheduled sync completed successfully');
       return null;
     } catch (error) {
-      console.error('Error in scheduled sync:', error);
+      console.error('❌ Error in 5paisa scheduled sync:', error);
       return null;
     }
   });
@@ -416,13 +521,13 @@ export const scheduledPriceSync10AM = functions
 export const scheduledPriceSync1155AM = functions
   .runWith({
     timeoutSeconds: 540,
-    memory: '512MB'
+    memory: '512MB' // 5paisa API doesn't need heavy memory
   })
   .pubsub
   .schedule('55 11 * * *') // 11:55 AM IST daily
   .timeZone('Asia/Kolkata')
   .onRun(async (context) => {
-    console.log('Running scheduled price sync (11:55 AM slot)...');
+    console.log('Running scheduled price sync (11:55 AM slot) - 5paisa API...');
     
     try {
       const config = await externalApiService.getScheduleConfig();
@@ -432,17 +537,14 @@ export const scheduledPriceSync1155AM = functions
         return null;
       }
       
-      const result = await syncService.syncAllPrices();
+      // Use 5paisa API (reliable for scheduled sync)
+      console.log('🚀 Starting 5paisa price sync...');
+      await syncService.syncAllPrices();
       
-      if (result.success) {
-        console.log('Scheduled sync completed:', result.message);
-      } else {
-        console.error('Scheduled sync failed:', result.message);
-      }
-      
+      console.log('✅ 5paisa scheduled sync completed successfully');
       return null;
     } catch (error) {
-      console.error('Error in scheduled sync:', error);
+      console.error('❌ Error in 5paisa scheduled sync:', error);
       return null;
     }
   });

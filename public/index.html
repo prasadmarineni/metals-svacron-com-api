@@ -369,13 +369,13 @@
     </div>
 
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('gold')">Gold</button>
+      <button class="tab" onclick="switchTab('gold')">Gold</button>
       <button class="tab" onclick="switchTab('silver')">Silver</button>
-      <button class="tab" onclick="switchTab('platinum')">Platinum</button>      <button class="tab" onclick="switchTab('config')">⚙️ Configuration</button>
+      <button class="tab" onclick="switchTab('platinum')">Platinum</button>      <button class="tab active" onclick="switchTab('config')">⚙️ Configuration</button>
     </div>
 
     <!-- Gold Tab -->
-    <div id="gold-tab" class="tab-content active">
+    <div id="gold-tab" class="tab-content">
       <div class="card">
         <h2>Update Gold Prices</h2>
         <div id="gold-alert" class="alert"></div>
@@ -593,7 +593,7 @@
     </div>
 
     <!-- Configuration Tab -->
-    <div id="config-tab" class="tab-content">
+    <div id="config-tab" class="tab-content active">
       <div class="card">
         <h2>⚙️ System Configuration</h2>
         
@@ -639,7 +639,13 @@
             <button class="btn" onclick="initializeDatabase()" style="background: #17a2b8;">
               🎯 Initialize with Mock Data
             </button>
-            <button class="btn btn-secondary" onclick="triggerManualSync()">
+            <button class="btn" onclick="triggerGoodReturnsSync()" style="background: #6f42c1;">
+              ✨ Sync from GoodReturns
+            </button>
+            <button class="btn" onclick="triggerGRTSync()" style="background: #28a745;">
+              💎 Sync from GRT Jewels
+            </button>
+            <button class="btn btn-secondary" onclick="trigger5PaisaSync()">
               🔄 Sync from 5paisa.com
             </button>
             <button class="btn" onclick="recalculateChanges()" style="background: #ffc107; color: #000;">
@@ -648,7 +654,9 @@
           </div>
           <p style="color: #666; font-size: 14px; margin-top: 10px;">
             <strong>Initialize</strong>: First-time setup with sample data (instant)<br>
-            <strong>Sync from 5paisa</strong>: Fetch live gold, silver, platinum prices (30-60s)<br>
+            <strong>GoodReturns</strong>: Most reliable, bypasses Cloudflare (RECOMMENDED, ~30s)<br>
+            <strong>GRT Jewels</strong>: Alternative scraper, may be blocked (20-30s)<br>
+            <strong>5paisa</strong>: API-based, can be slow to update (30-60s)<br>
             <strong>Recalculate Changes</strong>: Fix change values based on history (useful after manual updates)<br>
             <strong>For Exact Prices</strong>: Use manual update forms above (recommended)
           </p>
@@ -1056,8 +1064,9 @@
       }
     }
 
-    async function triggerManualSync() {
-      console.log('triggerManualSync called');
+    // Sync from GoodReturns (RECOMMENDED - MOST RELIABLE)
+    async function triggerGoodReturnsSync() {
+      console.log('triggerGoodReturnsSync called');
       const authToken = await getAuthToken();
       console.log('Auth token:', authToken ? 'present' : 'missing');
       if (!authToken) {
@@ -1070,8 +1079,8 @@
       console.log('Loader activated');
 
       try {
-        console.log('Sending sync request');
-        const response = await fetch(`${API_BASE_URL}/sync-prices`, {
+        console.log('Sending GoodReturns sync request');
+        const response = await fetch(`${API_BASE_URL}/sync-prices-goodreturns`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -1085,24 +1094,132 @@
         console.log('Response data:', data);
 
         if (response.ok) {
-          showConfigAlert('⏳ Price sync started in background! Waiting 55 seconds for completion...', 'success');
+          showConfigAlert('⏳ GoodReturns price sync started! This may take 30 seconds...', 'success');
+          
+          // Show countdown
+          let countdown = 35;
+          const countdownInterval = setInterval(() => {
+            countdown--;
+            if (countdown > 0) {
+              showConfigAlert(`✨ Syncing from GoodReturns (Puppeteer)... ${countdown} seconds remaining`, 'success');
+            } else {
+              clearInterval(countdownInterval);
+              showConfigAlert('✅ GoodReturns sync completed! Refresh the page to see updated prices.', 'success');
+            }
+          }, 1000);
+        } else {
+          showConfigAlert(data.error || 'Failed to start GoodReturns sync', 'error');
+        }
+      } catch (error) {
+        console.error('GoodReturns Sync error:', error);
+        showConfigAlert('Network error: ' + error.message, 'error');
+      } finally {
+        if (loader) loader.classList.remove('active');
+      }
+    }
+
+    // Sync from GRT Jewels (ALTERNATIVE)
+    async function triggerGRTSync() {
+      console.log('triggerGRTSync called');
+      const authToken = await getAuthToken();
+      console.log('Auth token:', authToken ? 'present' : 'missing');
+      if (!authToken) {
+        showConfigAlert('Please sign in first', 'error');
+        return;
+      }
+
+      const loader = document.getElementById('config-loader');
+      if (loader) loader.classList.add('active');
+      console.log('Loader activated');
+
+      try {
+        console.log('Sending GRT Jewels sync request');
+        const response = await fetch(`${API_BASE_URL}/sync-prices-grt`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ force: true })
+        });
+
+        console.log('Response status:', response.status);
+        const data = await response.json();
+        console.log('Response data:', data);
+
+        if (response.ok) {
+          showConfigAlert('⏳ GRT Jewels price sync started! Waiting 30 seconds for completion...', 'success');
+          
+          // Show countdown
+          let countdown = 30;
+          const countdownInterval = setInterval(() => {
+            countdown--;
+            if (countdown > 0) {
+              showConfigAlert(`💎 Syncing from GRT Jewels... ${countdown} seconds remaining`, 'success');
+            } else {
+              clearInterval(countdownInterval);
+              showConfigAlert('✅ GRT Jewels sync completed! Refresh the page to see updated prices.', 'success');
+            }
+          }, 1000);
+        } else {
+          showConfigAlert(data.error || 'Failed to start GRT sync', 'error');
+        }
+      } catch (error) {
+        console.error('GRT Sync error:', error);
+        showConfigAlert('Network error: ' + error.message, 'error');
+      } finally {
+        if (loader) loader.classList.remove('active');
+      }
+    }
+
+    // Sync from 5paisa (LEGACY - OPTIONAL)
+    async function trigger5PaisaSync() {
+      console.log('trigger5PaisaSync called');
+      const authToken = await getAuthToken();
+      console.log('Auth token:', authToken ? 'present' : 'missing');
+      if (!authToken) {
+        showConfigAlert('Please sign in first', 'error');
+        return;
+      }
+
+      const loader = document.getElementById('config-loader');
+      if (loader) loader.classList.add('active');
+      console.log('Loader activated');
+
+      try {
+        console.log('Sending 5paisa sync request');
+        const response = await fetch(`${API_BASE_URL}/sync-prices-5paisa`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ force: true })
+        });
+
+        console.log('Response status:', response.status);
+        const data = await response.json();
+        console.log('Response data:', data);
+
+        if (response.ok) {
+          showConfigAlert('⏳ 5paisa price sync started! Waiting 55 seconds for completion...', 'success');
           
           // Show countdown
           let countdown = 55;
           const countdownInterval = setInterval(() => {
             countdown--;
             if (countdown > 0) {
-              showConfigAlert(`⏳ Syncing prices... ${countdown} seconds remaining`, 'success');
+              showConfigAlert(`🔄 Syncing from 5paisa... ${countdown} seconds remaining`, 'success');
             } else {
               clearInterval(countdownInterval);
-              showConfigAlert('✅ Price sync completed! Refresh the page to see updated prices.', 'success');
+              showConfigAlert('✅ 5paisa sync completed! Refresh the page to see updated prices.', 'success');
             }
           }, 1000);
         } else {
-          showConfigAlert(data.error || 'Failed to start sync', 'error');
+          showConfigAlert(data.error || 'Failed to start 5paisa sync', 'error');
         }
       } catch (error) {
-        console.error('Sync error:', error);
+        console.error('5paisa Sync error:', error);
         showConfigAlert('Network error: ' + error.message, 'error');
       } finally {
         if (loader) loader.classList.remove('active');
